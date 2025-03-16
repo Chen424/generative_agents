@@ -10,7 +10,6 @@ import openai
 import time 
 
 from utils import *
-openai.api_key = openai_api_key
 
 def ChatGPT_request(prompt): 
   """
