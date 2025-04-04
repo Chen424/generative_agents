@@ -640,7 +640,7 @@ if __name__ == '__main__':
   parser.add_argument(
     '--origin',
     type=str,
-    default="base_the_ville_isabella_maria_klaus",
+    default="base_the_ville_smol_elections_5_voters",
     help='The name of the forked simulation'
   )
   parser.add_argument(
