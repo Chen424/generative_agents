@@ -198,7 +198,7 @@ def GPT_request(prompt, gpt_parameter):
                 model=gpt_parameter["engine"],
                 messages=messages,
                 temperature=gpt_parameter["temperature"],
-                max_tokens=gpt_parameter["max_tokens"],
+                max_completion_tokens=gpt_parameter["max_completion_tokens"],
                 top_p=gpt_parameter["top_p"],
                 frequency_penalty=gpt_parameter["frequency_penalty"],
                 presence_penalty=gpt_parameter["presence_penalty"],
@@ -273,7 +273,7 @@ def get_embedding(text, model=openai_config["embeddings"]):
 
 
 if __name__ == '__main__':
-  gpt_parameter = {"engine": openai_config["model"], "max_tokens": 50, 
+  gpt_parameter = {"engine": openai_config["model"], "max_completion_tokens": 50, 
                    "temperature": 0, "top_p": 1, "stream": False,
                    "frequency_penalty": 0, "presence_penalty": 0, 
                    "stop": ['"']}
