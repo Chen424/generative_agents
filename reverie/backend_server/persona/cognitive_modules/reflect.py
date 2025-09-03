@@ -71,16 +71,29 @@ def generate_action_event_triple(act_desp, persona):
 
 
 def generate_poig_score(persona, event_type, description): 
-  if debug: print ("GNS FUNCTION: <generate_poig_score>")
+    """
+    Generates a poignancy score for a given description.
+    """
+    if debug: 
+        print("GNS FUNCTION: <generate_poig_score>")
 
-  if "is idle" in description: 
-    return 1
+    if "is idle" in description: 
+        return 1
+    if "NoneType" in description:
+        return 0
 
-  if event_type == "event" or event_type == "thought": 
-    return run_gpt_prompt_event_poignancy(persona, description)[0]
-  elif event_type == "chat": 
-    return run_gpt_prompt_chat_poignancy(persona, 
-                           persona.scratch.act_description)[0]
+    if event_type == "event" or event_type == "thought": 
+        result = run_gpt_prompt_event_poignancy(persona, description)
+        if result is None:
+            print(f"[ERROR] GPT prompt returned None for description: {description}")
+            return 0  # Default poignancy score
+        return result[0]
+    elif event_type == "chat": 
+        result = run_gpt_prompt_chat_poignancy(persona, persona.scratch.act_description)
+        if result is None:
+            print(f"[ERROR] GPT prompt returned None for chat description: {persona.scratch.act_description}")
+            return 0  # Default poignancy score
+        return result[0]
 
 
 

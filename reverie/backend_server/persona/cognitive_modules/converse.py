@@ -266,7 +266,7 @@ def open_convo_session(persona, convo_mode, safe_mode=True, direct=False, questi
         line = question
       else:
         line = input("Enter Input: ")
-      if line == "end_convo": 
+      if line == "end": 
         break
 
       if int(run_gpt_generate_safety_score(persona, line)[0]) >= 8 and safe_mode: 

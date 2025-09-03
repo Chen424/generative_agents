@@ -93,24 +93,48 @@ class MemoryTree:
     INPUT
       temp_address: optional arena address
     OUTPUT 
-      str list of all accessible game objects in the gmae arena. 
+      str list of all accessible game objects in the game arena. 
     EXAMPLE STR OUTPUT
       "phone, charger, bed, nightstand"
     """
-    print(f"[DEBUG] arena = {arena}")  
-    curr_world, curr_sector, curr_arena = arena.split(":")
+    print(f"[DEBUG] arena = {arena}")
+    
+    try:
+        arena = arena.replace("Answer:", "")
+        # Split and validate the arena format
+        parts = arena.split(":")
+        if len(parts) < 3:
+            raise ValueError(f"Invalid arena format: {arena}. Expected at least 3 parts separated by ':'.")
+        curr_world, curr_sector, curr_arena = parts[:3]  # Only take the first three parts
 
-    curr_arena = re.sub(r'[{}]', '', curr_arena).strip()
-    if not curr_arena: 
-      return ""
+        # Clean up the arena string
+        curr_arena = re.sub(r'[{}]', '', curr_arena).strip()
+        if not curr_arena:
+            return ""
 
-    try: 
-      print("Available arenas:", list(self.tree[curr_world][curr_sector].keys()))
-      print("Trying to access:", curr_arena.lower().strip())
-      x = ", ".join(list(self.tree[curr_world][curr_sector][curr_arena]))
-    except: 
-      x = ", ".join(list(self.tree[curr_world][curr_sector][next(k for k in self.tree[curr_world][curr_sector] if k.lower().strip() == curr_arena.lower().strip())]))
-    return x
+        # Attempt to access the arena game objects
+        try:
+            print("Available arenas:", list(self.tree[curr_world][curr_sector].keys()))
+            print("Trying to access:", curr_arena.lower().strip())
+            if curr_arena in self.tree[curr_world][curr_sector]:
+                x = ", ".join(list(self.tree[curr_world][curr_sector][curr_arena]))
+                return x
+            else:
+                # Attempt to find a matching arena name
+                for k in self.tree[curr_world][curr_sector]:
+                    if k.lower().strip() == curr_arena.lower().strip():
+                        x = ", ".join(list(self.tree[curr_world][curr_sector][k]))
+                        return x
+                # If no match is found, log the error and continue
+                print(f"[ERROR] Arena '{curr_arena}' not found in sector '{curr_sector}'. Trying next...")
+                return None
+        except KeyError as e:
+            print(f"[ERROR] {e}")
+            return None
+
+    except ValueError as e:
+        print(f"Error processing arena: {e}")
+        return None
 
 
 if __name__ == '__main__':

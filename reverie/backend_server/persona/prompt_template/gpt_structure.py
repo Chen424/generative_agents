@@ -16,6 +16,29 @@ from persona.prompt_template.openai_logger_singleton import OpenAICostLogger_Sin
 config_path = Path("../../openai_config.json")
 with open(config_path, "r") as f:
     openai_config = json.load(f) 
+import os
+import datetime
+def log_request_and_response(prompt, response, log_file="gpt_requests_log_4o.txt"):
+    """
+    Logs the GPT request prompt and response to a file.
+    Creates the file if it does not exist.
+    """
+    # 確保目錄存在
+    log_dir = os.path.dirname(log_file)
+    if log_dir and not os.path.exists(log_dir):
+        os.makedirs(log_dir)  # 創建目錄
+
+    # 獲取當前時間戳
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        # 打開文件並寫入內容
+        with open(log_file, "a", encoding="utf-8") as file:
+            #file.write(f"Timestamp: {timestamp}\n")
+            file.write(f"Request Prompt:\n{prompt}\n")
+            file.write(f"Response:\n{response}\n")
+            file.write("-" * 50 + "\n")
+    except Exception as e:
+        print(f"Error writing to log file: {e}")
   
 def setup_client(type: str, config: dict):
   """Setup the OpenAI client.
@@ -251,6 +274,7 @@ def safe_generate_response(prompt,
 
   for i in range(repeat): 
     curr_gpt_response = GPT_request(prompt, gpt_parameter)
+    log_request_and_response(curr_gpt_response,prompt)
     try:
       if func_validate(curr_gpt_response, prompt=prompt): 
         return func_clean_up(curr_gpt_response, prompt=prompt)
