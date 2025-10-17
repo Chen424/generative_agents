@@ -17,6 +17,7 @@ def execute(persona, maze, personas, plan):
   plan = re.sub(r'\s*:\s*', ':', plan)
   plan = plan.replace("{", "").replace("}", "")
   plan = plan.replace("Answer:", "")
+  plan = plan.replace("Address ", "")
   """
   Given a plan (action's string address), we execute the plan (actually 
   outputs the tile coordinate path and the next coordinate for the 
@@ -47,8 +48,9 @@ def execute(persona, maze, personas, plan):
     target_tiles = None
 
     print (plan)
-
-    if "<persona>" in plan: 
+    if "<speech>" in plan :
+      plan = plan.replace("<speech>", "<persona>")
+    if  "<persona>" in plan: 
       # Executing persona-persona interaction.
       target_p_tile = (personas[plan.split("<persona>")[-1].strip()]
                        .scratch.curr_tile)
@@ -71,9 +73,8 @@ def execute(persona, maze, personas, plan):
           target_tiles = [potential_path[int(len(potential_path)/2)]]
         else: 
           target_tiles = [potential_path[int(len(potential_path)/2+1)]]
-    
-    elif "<waiting>" in plan: 
-      # Executing interaction where the persona has decided to wait before 
+    elif "<waiting>"  in plan:
+      # Executing interaction where the persona has decided to wait before
       # executing their action.
       x = int(plan.split()[1])
       y = int(plan.split()[2])

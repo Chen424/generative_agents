@@ -24,7 +24,7 @@ with open(config_path, "r") as f:
     model_config = json.load(f) 
 using_model=model_config["model"]
 import os
-def log_request_and_response(prompt, response, log_file="gpt_requests_log_4o.txt"):
+def log_request_and_response(persona,prompt, response, log_file="gpt_requests_log_4o.txt"):
     """
     Logs the GPT request prompt and response to a file.
     Creates the file if it does not exist.
@@ -34,8 +34,8 @@ def log_request_and_response(prompt, response, log_file="gpt_requests_log_4o.txt
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)  # 創建目錄
 
-    # 獲取當前時間戳
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 使用遊戲內的時間戳記
+    timestamp = persona.scratch.curr_time.strftime("%Y-%m-%d %H:%M:%S")
     try:
         # 打開文件並寫入內容
         with open(log_file, "a", encoding="utf-8") as file:
@@ -107,7 +107,7 @@ def run_gpt_prompt_wake_up_hour(persona, test_input=None, verbose=False):
 
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -191,7 +191,7 @@ def run_gpt_prompt_daily_plan(persona,
 
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   output = ([f"wake up and complete the morning routine at {wake_up_hour}:00 am"]
               + output)
 
@@ -329,7 +329,7 @@ def run_gpt_prompt_generate_hourly_schedule(persona,
   
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -722,7 +722,7 @@ def run_gpt_prompt_action_sector(action_description,
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   y = f"{maze.access_tile(persona.scratch.curr_tile)['world']}"
   x = [i.strip() for i in persona.s_mem.get_str_accessible_sectors(y).split(",")]
   if output not in x: 
@@ -820,7 +820,7 @@ def run_gpt_prompt_action_arena(action_description,
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   print (output)
   # y = f"{act_world}:{act_sector}"
   # x = [i.strip() for i in persona.s_mem.get_str_accessible_sector_arenas(y).split(",")]
@@ -880,7 +880,7 @@ def run_gpt_prompt_action_game_object(action_description,
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   x = [i.strip() for i in persona.s_mem.get_str_accessible_arena_game_objects(temp_address).split(",")]
   if output not in x: 
@@ -1055,7 +1055,7 @@ def run_gpt_prompt_event_triple(action_description, persona, verbose=False):
   fail_safe = get_fail_safe(persona) ########
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   output = (persona.name, output[0], output[1])
 
   if debug or verbose: 
@@ -1193,7 +1193,7 @@ def run_gpt_prompt_act_obj_event_triple(act_game_object, act_obj_desc, persona, 
   fail_safe = get_fail_safe(act_game_object)
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   output = (act_game_object, output[0], output[1])
 
   if debug or verbose: 
@@ -1341,7 +1341,7 @@ def run_gpt_prompt_new_decomp_schedule(persona,
   fail_safe = get_fail_safe(main_act_dur, truncated_act_dur)
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
   
   # print ("* * * * output")
   # print (output)
@@ -1451,12 +1451,111 @@ def run_gpt_prompt_decide_to_talk(persona, target_persona, retrieved,test_input=
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
                       prompt_input, prompt, output)
   
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
+
+def run_gpt_prompt_decide_to_speech(persona, target_persona, retrieved,test_input=None, 
+                                       verbose=False): 
+  def create_prompt_input(init_persona, target_persona, retrieved, 
+                          test_input=None): 
+    last_chat = init_persona.a_mem.get_last_chat(target_persona.name)
+    last_chatted_time = ""
+    last_chat_about = ""
+    if last_chat: 
+      last_chatted_time = last_chat.created.strftime("%B %d, %Y, %H:%M:%S")
+      last_chat_about = last_chat.description
+
+    context = ""
+    for c_node in retrieved["events"]: 
+      curr_desc = c_node.description.split(" ")
+      curr_desc[2:3] = ["was"]
+      curr_desc = " ".join(curr_desc)
+      context +=  f"{curr_desc}. "
+    context += "\n"
+    for c_node in retrieved["thoughts"]: 
+      context +=  f"{c_node.description}. "
+
+    curr_time = init_persona.scratch.curr_time.strftime("%B %d, %Y, %H:%M:%S %p")
+    init_act_desc = init_persona.scratch.act_description
+    if "(" in init_act_desc: 
+      init_act_desc = init_act_desc.split("(")[-1][:-1]
+    
+    if len(init_persona.scratch.planned_path) == 0 and "waiting" not in init_act_desc: 
+      init_p_desc = f"{init_persona.name} is already {init_act_desc}"
+    elif "waiting" in init_act_desc:
+      init_p_desc = f"{init_persona.name} is {init_act_desc}"
+    else: 
+      init_p_desc = f"{init_persona.name} is on the way to {init_act_desc}"
+
+    target_act_desc = target_persona.scratch.act_description
+    if "(" in target_act_desc: 
+      target_act_desc = target_act_desc.split("(")[-1][:-1]
+    
+    if len(target_persona.scratch.planned_path) == 0 and "waiting" not in init_act_desc: 
+      target_p_desc = f"{target_persona.name} is already {target_act_desc}"
+    elif "waiting" in init_act_desc:
+      target_p_desc = f"{init_persona.name} is {init_act_desc}"
+    else: 
+      target_p_desc = f"{target_persona.name} is on the way to {target_act_desc}"
+
+
+    prompt_input = []
+    prompt_input += [context]
+
+    prompt_input += [curr_time]
+
+    prompt_input += [init_persona.name]
+    prompt_input += [target_persona.name]
+    prompt_input += [last_chatted_time]
+    prompt_input += [last_chat_about]
+
+
+    prompt_input += [init_p_desc]
+    prompt_input += [target_p_desc]
+    prompt_input += [init_persona.name]
+    prompt_input += [target_persona.name]
+    return prompt_input
+  
+  def __func_validate(gpt_response, prompt=""): 
+    try: 
+      if gpt_response.split("Answer in yes or no:")[-1].strip().lower() in ["yes", "no"]: 
+        return True
+      return False     
+    except:
+      return False 
+
+  def __func_clean_up(gpt_response, prompt=""):
+    return gpt_response.split("Answer in yes or no:")[-1].strip().lower()
+
+  def get_fail_safe(): 
+    fs = "no"
+    return fs
+
+
+
+  gpt_param = {"engine": using_model, "max_tokens": 20, 
+               "temperature": 0, "top_p": 1, "stream": False,
+               "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
+  prompt_template = "persona/prompt_template/v2/decide_to_speech_v1.txt"
+  prompt_input = create_prompt_input(persona, target_persona, retrieved,
+                                     test_input)
+  prompt = generate_prompt(prompt_input, prompt_template)
+
+  fail_safe = get_fail_safe()
+  output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
+                                   __func_validate, __func_clean_up)
+  log_request_and_response(persona,prompt, output)
+
+  if debug or verbose: 
+    print_run_prompts(prompt_template, persona, gpt_param, 
+                      prompt_input, prompt, output)
+  # if persona.name  in ["Adam Smith", "Isabella Rodriguez"]:
+  #   output = "yes"
   return output, [output, prompt, gpt_param, prompt_input, fail_safe]
 
 
@@ -1550,7 +1649,7 @@ def run_gpt_prompt_decide_to_react(persona, target_persona, retrieved,test_input
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -1694,7 +1793,7 @@ def run_gpt_prompt_create_conversation(persona, target_persona, curr_loc,
   fail_safe = get_fail_safe(persona, target_persona)
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -1702,6 +1801,134 @@ def run_gpt_prompt_create_conversation(persona, target_persona, curr_loc,
   
   return output, [output, prompt, gpt_param, prompt_input, fail_safe]
 
+def run_gpt_prompt_create_speech(persona, target_persona, curr_loc,
+                                       test_input=None, verbose=False): 
+  def create_prompt_input(init_persona, target_persona, curr_loc, 
+                          test_input=None): 
+
+    prev_convo_insert = "\n"
+    if init_persona.a_mem.seq_chat: 
+      for i in init_persona.a_mem.seq_chat: 
+        if i.object == target_persona.scratch.name: 
+          v1 = int((init_persona.scratch.curr_time - i.created).total_seconds()/60)
+          prev_convo_insert += f'{str(v1)} minutes ago, they had the following conversation.\n'
+          for row in i.filling: 
+            prev_convo_insert += f'{row[0]}: "{row[1]}"\n'
+          break
+    if prev_convo_insert == "\n": 
+      prev_convo_insert = ""
+    if init_persona.a_mem.seq_chat: 
+      if int((init_persona.scratch.curr_time - init_persona.a_mem.seq_chat[-1].created).total_seconds()/60) > 480: 
+        prev_convo_insert = ""
+
+
+    init_persona_thought_nodes = init_persona.a_mem.retrieve_relevant_thoughts(target_persona.scratch.act_event[0],
+                                target_persona.scratch.act_event[1],
+                                target_persona.scratch.act_event[2])
+    init_persona_thought = ""
+    for i in init_persona_thought_nodes: 
+      init_persona_thought += f"-- {i.description}\n"
+
+    target_persona_thought_nodes = target_persona.a_mem.retrieve_relevant_thoughts(init_persona.scratch.act_event[0],
+                                init_persona.scratch.act_event[1],
+                                init_persona.scratch.act_event[2])
+    target_persona_thought = ""
+    for i in target_persona_thought_nodes: 
+      target_persona_thought += f"-- {i.description}\n"
+
+    init_persona_curr_desc = ""
+    if init_persona.scratch.planned_path: 
+      init_persona_curr_desc = f"{init_persona.name} is on the way to {init_persona.scratch.act_description}"
+    else: 
+      init_persona_curr_desc = f"{init_persona.name} is {init_persona.scratch.act_description}"
+
+    target_persona_curr_desc = ""
+    if target_persona.scratch.planned_path: 
+      target_persona_curr_desc = f"{target_persona.name} is on the way to {target_persona.scratch.act_description}"
+    else: 
+      target_persona_curr_desc = f"{target_persona.name} is {target_persona.scratch.act_description}"
+ 
+
+    curr_loc = curr_loc["arena"]
+
+    prompt_input = []
+    prompt_input += [init_persona.scratch.get_str_iss()]
+    prompt_input += [target_persona.scratch.get_str_iss()]
+
+    prompt_input += [init_persona.name]
+    prompt_input += [target_persona.name]
+    prompt_input += [init_persona_thought]
+
+    prompt_input += [target_persona.name]
+    prompt_input += [init_persona.name]
+    prompt_input += [target_persona_thought]
+
+    prompt_input += [init_persona.scratch.curr_time.strftime("%B %d, %Y, %H:%M:%S")]
+
+    prompt_input += [init_persona_curr_desc]
+    prompt_input += [target_persona_curr_desc]
+
+    prompt_input += [prev_convo_insert]
+
+    prompt_input += [init_persona.name]
+    prompt_input += [target_persona.name]
+
+    prompt_input += [curr_loc]
+    prompt_input += [init_persona.name]
+    return prompt_input
+  
+  def __func_clean_up(gpt_response, prompt=""):
+    # print ("???")
+    # print (gpt_response)
+
+
+    gpt_response = (prompt + gpt_response).split("What would the speaker say?")[-1].strip()
+    content = re.findall('"([^"]*)"', gpt_response)
+
+    speaker_order = []
+    for i in gpt_response.split("\n"): 
+      name = i.split(":")[0].strip() 
+      if name: 
+        speaker_order += [name]
+
+    ret = []
+    for count, speaker in enumerate(speaker_order): 
+      ret += [[speaker, content[count]]]
+
+    return ret
+
+  def __func_validate(gpt_response, prompt=""): 
+    try: 
+      __func_clean_up(gpt_response, prompt)
+      return True
+    except:
+      return False 
+
+  def get_fail_safe(init_persona, target_persona): 
+    convo = [[init_persona.name, "Hi!"], 
+             [target_persona.name, "Hi!"]]
+    return convo
+
+
+  gpt_param = {"engine": using_model, "max_tokens": 1000, 
+               "temperature": 0.7, "top_p": 1, "stream": False,
+               "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
+  prompt_template = "persona/prompt_template/v2/create_speech_v1.txt"
+  prompt_input = create_prompt_input(persona, target_persona, curr_loc, 
+                                     test_input)
+  prompt = generate_prompt(prompt_input, prompt_template)
+  prompt += '\n It should only conain the lines with the format of "SPEAKER: "SPEECH CONTENT""'
+
+  fail_safe = get_fail_safe(persona, target_persona)
+  output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
+                                   __func_validate, __func_clean_up)
+  log_request_and_response(persona,prompt, output)
+
+  if debug or verbose: 
+    print_run_prompts(prompt_template, persona, gpt_param, 
+                      prompt_input, prompt, output)
+  
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
 
 
 
@@ -1770,7 +1997,7 @@ def run_gpt_prompt_summarize_conversation(persona, conversation, test_input=None
   #              "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
   # prompt_template = "persona/prompt_template/v2/summarize_conversation_v1.txt"
   # prompt_input = create_prompt_input(conversation, test_input)
-  # prompt = generate_prompt(prompt_input, prompt_template)
+  # prompt = fprompt(prompt_input, prompt_template)
 
   # fail_safe = get_fail_safe()
   # output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
@@ -1829,7 +2056,7 @@ def run_gpt_prompt_extract_keywords(persona, description, test_input=None, verbo
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
 
   if debug or verbose: 
@@ -1875,7 +2102,7 @@ def run_gpt_prompt_keyword_to_thoughts(persona, keyword, concept_summary, test_i
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -1934,7 +2161,7 @@ def run_gpt_prompt_convo_to_thoughts(persona,
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -2261,7 +2488,7 @@ def run_gpt_prompt_focal_pt(persona, statements, n, test_input=None, verbose=Fal
   fail_safe = get_fail_safe(n)
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -2303,7 +2530,7 @@ def run_gpt_prompt_insight_and_guidance(persona, statements, n, test_input=None,
 
 
 
-  gpt_param = {"engine": using_model, "max_tokens": 150, 
+  gpt_param = {"engine": using_model, "max_tokens": 350, 
                "temperature": 0.5, "top_p": 1, "stream": False,
                "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
   prompt_template = "persona/prompt_template/v2/insight_and_evidence_v1.txt"
@@ -2313,7 +2540,7 @@ def run_gpt_prompt_insight_and_guidance(persona, statements, n, test_input=None,
   fail_safe = get_fail_safe(n)
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -2748,7 +2975,7 @@ def run_gpt_prompt_generate_next_convo_line(persona, interlocutor_desc, prev_con
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -2789,7 +3016,7 @@ def run_gpt_prompt_generate_whisper_inner_thought(persona, whisper, test_input=N
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -2827,7 +3054,7 @@ def run_gpt_prompt_planning_thought_on_convo(persona, all_utt, test_input=None, 
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -2894,7 +3121,7 @@ def run_gpt_prompt_memo_on_convo(persona, all_utt, test_input=None, verbose=Fals
   fail_safe = get_fail_safe()
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
-  log_request_and_response(prompt, output)
+  log_request_and_response(persona,prompt, output)
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 
@@ -2965,6 +3192,99 @@ def extract_first_json_dict(data_str):
     except json.JSONDecodeError:
         # If parsing fails, return None
         return None
+
+
+def run_gpt_generate_iterative_chat_utt_speech(maze, init_persona, target_persona, retrieved, curr_context, curr_chat, test_input=None, verbose=False): 
+  def create_prompt_input(maze, init_persona, target_persona, retrieved, curr_context, curr_chat, test_input=None):
+    persona = init_persona
+    prev_convo_insert = "\n"
+    if persona.a_mem.seq_chat: 
+      for i in persona.a_mem.seq_chat: 
+        if i.object == target_persona.scratch.name: 
+          v1 = int((persona.scratch.curr_time - i.created).total_seconds()/60)
+          prev_convo_insert += f'{str(v1)} minutes ago, {persona.scratch.name} and {target_persona.scratch.name} were already {i.description} This context takes place after the speech.'
+          break
+    if prev_convo_insert == "\n": 
+      prev_convo_insert = ""
+    if persona.a_mem.seq_chat: 
+      if int((persona.scratch.curr_time - persona.a_mem.seq_chat[-1].created).total_seconds()/60) > 480: 
+        prev_convo_insert = ""
+    print (prev_convo_insert)
+
+    curr_sector = f"{maze.access_tile(persona.scratch.curr_tile)['sector']}"
+    curr_arena= f"{maze.access_tile(persona.scratch.curr_tile)['arena']}"
+    curr_location = f"{curr_arena} in {curr_sector}"
+
+    retrieved_str = ""
+    for key, vals in retrieved.items(): 
+      for v in vals: 
+        retrieved_str += f"- {v.description}\n"
+
+
+    convo_str = ""
+    for i in curr_chat:
+      convo_str += ": ".join(i) + "\n"
+    if convo_str == "": 
+      convo_str = "[The speech has not started yet -- start it!]"
+
+    init_iss = f"Here is Here is a brief description of {init_persona.scratch.name}.\n{init_persona.scratch.get_str_iss()}"
+    prompt_input = [init_iss, init_persona.scratch.name, retrieved_str, prev_convo_insert,
+      curr_location, curr_context, init_persona.scratch.name, target_persona.scratch.name,
+      convo_str, init_persona.scratch.name, target_persona.scratch.name,
+      init_persona.scratch.name, init_persona.scratch.name,
+      init_persona.scratch.name
+      ]
+    return prompt_input
+
+  def __chat_func_clean_up(gpt_response, prompt=""): 
+    gpt_response = extract_first_json_dict(gpt_response)
+
+    cleaned_dict = dict()
+    cleaned = []
+    for key, val in gpt_response.items(): 
+      cleaned += [val]
+    cleaned_dict["utterance"] = cleaned[0]
+    cleaned_dict["end"] = True
+    if "f" in str(cleaned[1]) or "F" in str(cleaned[1]): 
+      cleaned_dict["end"] = False
+
+    return cleaned_dict
+
+  def __chat_func_validate(gpt_response, prompt=""): 
+    print ("ugh...")
+    try: 
+      # print ("debug 1")
+      # print (gpt_response)
+      # print ("debug 2")
+
+      print (extract_first_json_dict(gpt_response))
+      # print ("debug 3")
+
+      return True
+    except:
+      return False 
+
+  def get_fail_safe():
+    cleaned_dict = dict()
+    cleaned_dict["utterance"] = "..."
+    cleaned_dict["end"] = False
+    return cleaned_dict
+
+  print ("11")
+  prompt_template = "persona/prompt_template/v3_ChatGPT/iterative_convo_speech_v1.txt" 
+  prompt_input = create_prompt_input(maze, init_persona, target_persona, retrieved, curr_context, curr_chat) 
+  print ("22")
+  prompt = generate_prompt(prompt_input, prompt_template)
+  print (prompt)
+  fail_safe = get_fail_safe() 
+  output = ChatGPT_safe_generate_response_OLD(prompt, 3, fail_safe,
+                        __chat_func_validate, __chat_func_clean_up, verbose)
+  print (output)
+  
+  gpt_param = {"engine": using_model, "max_tokens": 50, 
+               "temperature": 0, "top_p": 1, "stream": False,
+               "frequency_penalty": 0, "presence_penalty": 0, "stop": None}
+  return output, [output, prompt, gpt_param, prompt_input, fail_safe]
 
 
 def run_gpt_generate_iterative_chat_utt(maze, init_persona, target_persona, retrieved, curr_context, curr_chat, test_input=None, verbose=False): 

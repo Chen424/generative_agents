@@ -297,6 +297,36 @@ def generate_convo(maze, init_persona, target_persona):
   if debug: print ("GNS FUNCTION: <generate_convo>")
   return convo, convo_length
 
+def generate_speech(maze, init_persona, target_persona): 
+  curr_loc = maze.access_tile(init_persona.scratch.curr_tile)
+
+  # convo = run_gpt_prompt_create_speech(init_persona, target_persona, curr_loc)[0]
+  # convo = agent_chat_v1(maze, init_persona, target_persona)
+  convo = agent_speech_v1(maze, init_persona, target_persona)
+  all_utt = ""
+
+  for row in convo: 
+    speaker = row[0]
+    utt = row[1]
+    all_utt += f"{speaker}: {utt}\n"
+
+  convo_length = math.ceil(int(len(all_utt)/8) / 30)
+
+  if debug: print ("GNS FUNCTION: <generate_convo>")
+  # Log the conversation and its length to a file
+  log_file = "convo_log.txt"
+  timestamp = init_persona.scratch.curr_time.strftime("%Y-%m-%d %H:%M:%S")  # Use in-game time
+  try:
+        with open(log_file, "a", encoding="utf-8") as file:
+            file.write(f"Timestamp: {timestamp}\n")
+            file.write("Conversation Log:\n")
+            for row in convo:
+                file.write(f"{row[0]}: {row[1]}\n")
+            file.write(f"Conversation Length: {convo_length}\n")
+            file.write("-" * 50 + "\n")
+  except Exception as e:
+        print(f"[ERROR] Failed to write to log file: {e}")
+  return convo, convo_length
 
 def generate_convo_summary(persona, convo): 
   convo_summary = run_gpt_prompt_summarize_conversation(persona, convo)[0]
@@ -312,6 +342,14 @@ def generate_decide_to_talk(init_persona, target_persona, retrieved):
   else: 
     return False
 
+def generate_decide_to_speech(init_persona, target_persona, retrieved): 
+  x =run_gpt_prompt_decide_to_speech(init_persona, target_persona, retrieved)[0]
+  if debug: print ("GNS FUNCTION: <generate_decide_to_speech>")
+
+  if x == "yes": 
+    return True
+  else: 
+    return True
 
 def generate_decide_to_react(init_persona, target_persona, retrieved): 
   if debug: print ("GNS FUNCTION: <generate_decide_to_react>")
@@ -747,7 +785,47 @@ def _should_react(persona, retrieved, personas):
       return True
 
     return False
+  def write_log(log_message):
+      with open("convo_log_2.txt", "a") as file:  # Open the log file in append mode
+          file.write(log_message + "\n")
+  def lets_speech(init_persona, target_persona, retrieved):
+    if (not target_persona.scratch.act_address 
+        or not target_persona.scratch.act_description
+        or not init_persona.scratch.act_address
+        or not init_persona.scratch.act_description): 
+      write_log("no act address or description\n")
+      return False
 
+    if ("sleeping" in target_persona.scratch.act_description 
+        or "sleeping" in init_persona.scratch.act_description): 
+      write_log("sleeping in description\n")
+      return False
+
+    if init_persona.scratch.curr_time.hour == 23: 
+      write_log("curr time is 23\n")
+      return False
+
+    if "<waiting>" in target_persona.scratch.act_address: 
+      write_log("waiting in act address\n")
+      return False
+
+    if (target_persona.scratch.chatting_with 
+      or init_persona.scratch.chatting_with): 
+      write_log("either is chatting with someone\n")
+      return False
+
+    if (target_persona.name in init_persona.scratch.chatting_with_buffer): 
+       if init_persona.scratch.chatting_with_buffer[target_persona.name] > 0: 
+         write_log("in chatting with buffer\n")
+         return False
+
+    if generate_decide_to_speech(init_persona, target_persona, retrieved):
+      write_log("success to generate_decide_to_speech\n")
+      return True
+    else:
+      write_log("fail to generate_decide_to_speech\n")
+      return False
+    
   def lets_react(init_persona, target_persona, retrieved): 
     if (not target_persona.scratch.act_address 
         or not target_persona.scratch.act_description
@@ -781,7 +859,7 @@ def _should_react(persona, retrieved, personas):
         .strftime("%B %d, %Y, %H:%M:%S"))
       return f"wait: {wait_until}"
     elif react_mode == "2":
-      return False
+      #return False
       return "do other things"
     else:
       return False #"keep" 
@@ -800,7 +878,19 @@ def _should_react(persona, retrieved, personas):
 
   if ":" not in curr_event.subject: 
     # this is a persona event. 
+    if lets_speech(persona, personas[curr_event.subject], retrieved):
+      with open("convo_log.txt", "a") as file:  # Open the log file in append mode
+        file.write("success to lets_speech\n")
+        file.write(f"persona.name: {persona.name}\n")
+        file.write(f"curr_event.subject: {curr_event.subject}\n")
+        file.write(f"retrieved: {retrieved}\n")
+      return f"speech to {curr_event.subject}"
     if lets_talk(persona, personas[curr_event.subject], retrieved):
+      with open("convo_log.txt", "a") as file:  # Open the log file in append mode
+        file.write("success to lets_talk\n")
+        file.write(f"persona.name: {persona.name}\n")
+        file.write(f"curr_event.subject: {curr_event.subject}\n")
+        file.write(f"retrieved: {retrieved}\n")
       return f"chat with {curr_event.subject}"
     react_mode = lets_react(persona, personas[curr_event.subject], 
                             retrieved)
@@ -908,6 +998,66 @@ def _chat_react(maze, persona, focused_event, reaction_mode, personas):
       act_pronunciatio, act_obj_description, act_obj_pronunciatio, 
       act_obj_event, act_start_time)
 
+def _speech_react(maze, persona, focused_event, reaction_mode, personas):
+    """
+    Handles the speech reaction where init_persona gives a speech to target_persona.
+
+    INPUT:
+        maze: The current Maze instance.
+        persona: The Persona instance initiating the speech.
+        focused_event: The event that triggered the reaction.
+        reaction_mode: The reaction mode string (e.g., "speech to {target_persona.name}").
+        personas: A dictionary of all personas in the simulation.
+    """
+    # Get the initiating and target personas
+    init_persona = persona
+    target_persona = personas[reaction_mode[10:].strip()]  # Extract target persona name
+    curr_personas = [init_persona, target_persona]
+
+    # Generate the speech content and duration
+    speech, duration_min = generate_speech(maze, init_persona, target_persona)
+    speech_summary = generate_convo_summary(init_persona, speech)
+    inserted_act = speech_summary
+    inserted_act_dur = duration_min
+
+    act_start_time = init_persona.scratch.curr_time
+
+    act_start_time = target_persona.scratch.act_start_time
+
+    curr_time = target_persona.scratch.curr_time
+    if curr_time.second != 0: 
+      temp_curr_time = curr_time + datetime.timedelta(seconds=60 - curr_time.second)
+      chatting_end_time = temp_curr_time + datetime.timedelta(minutes=inserted_act_dur)
+    else: 
+      chatting_end_time = curr_time + datetime.timedelta(minutes=inserted_act_dur)
+    
+    for role, p in [("init", init_persona), ("target", target_persona)]: 
+      if role == "init": 
+        act_address = f"<speech> {target_persona.name}"
+        act_event = (init_persona.name, "speech to", target_persona.name)
+        chatting_with = target_persona.name
+        chatting_with_buffer = {}
+        chatting_with_buffer[target_persona.name] = 400
+      elif role == "target": 
+        act_address = f"<persona> {init_persona.name}"
+        act_event = (p.name, "speech listening from", init_persona.name)
+        chatting_with = init_persona.name
+        chatting_with_buffer = {}
+        chatting_with_buffer[init_persona.name] = 400
+    
+    act_address = f"<speech> {target_persona.name}"
+    act_event = (init_persona.name, "speech to", target_persona.name)
+    
+    act_pronunciatio = "🗣️"  # Emoji for speech
+    act_obj_description = None
+    act_obj_pronunciatio = None
+    act_obj_event = (None, None, None)
+
+    # Add the speech action to the init_persona's schedule
+    _create_react(p, inserted_act, inserted_act_dur,
+      act_address, act_event, chatting_with, speech, chatting_with_buffer, chatting_end_time,
+      act_pronunciatio, act_obj_description, act_obj_pronunciatio, 
+      act_obj_event, act_start_time)
 
 def _wait_react(persona, reaction_mode): 
   p = persona
@@ -985,9 +1135,23 @@ def plan(persona, maze, personas, new_day, retrieved):
   if focused_event: 
     reaction_mode = _should_react(persona, focused_event, personas)
     if reaction_mode: 
+      with open("convo_log_2.txt", "a") as file:  # Open the log file in append mode
+          file.write(f"The reaction mode : {reaction_mode}\n")
       # If we do want to chat, then we generate conversation 
       if reaction_mode[:9] == "chat with":
         _chat_react(maze, persona, focused_event, reaction_mode, personas)
+        with open("convo_log_2.txt", "a") as file:  # Open the log file in append mode
+          file.write("success to chat_react\n")
+          file.write(f"persona.name: {persona.name}\n")
+          file.write(f"reaction_mode: {reaction_mode}\n")
+          file.write(f"personas: {personas}\n")
+      elif reaction_mode[:6] == "speech":
+        _speech_react(maze, persona, focused_event, reaction_mode, personas)
+        with open("convo_log_2.txt", "a") as file:  # Open the log file in append mode
+          file.write("success to speech_react\n")
+          file.write(f"persona.name: {persona.name}\n")
+          file.write(f"reaction_mode: {reaction_mode}\n")
+          file.write(f"personas: {personas}\n")
       elif reaction_mode[:4] == "wait": 
         _wait_react(persona, reaction_mode)
       # elif reaction_mode == "do other things": 
@@ -996,10 +1160,11 @@ def plan(persona, maze, personas, new_day, retrieved):
   # Step 3: Chat-related state clean up. 
   # If the persona is not chatting with anyone, we clean up any of the 
   # chat-related states here. 
-  if persona.scratch.act_event[1] != "chat with":
+  if persona.scratch.act_event[1] != "chat with" or persona.scratch.act_event[1] != "speech":
     persona.scratch.chatting_with = None
     persona.scratch.chat = None
     persona.scratch.chatting_end_time = None
+  
   # We want to make sure that the persona does not keep conversing with each
   # other in an infinite loop. So, chatting_with_buffer maintains a form of 
   # buffer that makes the persona wait from talking to the same target 
